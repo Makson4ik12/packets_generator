@@ -5,50 +5,63 @@ from scapy.layers.l2 import Ether, ARP
 
 packets_collection = dict()
 
-def get_network_interfaces():
+def getNetworkInterfaces() -> dict:
     interfaces = {}
-
-    print("Найденные сетевые интерфейсы:\n> ")
-
+    
     for iface, addrs in psutil.net_if_addrs().items():
+        iface_info = {"name": iface, "ip": None}
+        
         for addr in addrs:
-            if addr.family == psutil.AF_LINK:
-                interfaces[iface] = addrs
-                break
+            if addr.family == socket.AF_INET:
+                iface_info["ip"] = addr.address
 
+        interfaces[iface] = iface_info
+    
     return interfaces
 
-def choose_interface(interfaces):
-    print("Сетевые интерфейсы:")
+def chooseInterface(interfaces):
+    print("\nСетевые интерфейсы:")
 
-    for idx, iface in enumerate(interfaces.keys()):
-        print(f"\t{idx}: {iface}")
+    for idx, iface in enumerate(interfaces.values()):
+        print(f"\t[{idx}] {iface['name']} ({iface['ip']})")
 
-    idx = int(input("Введите номер интерфейса:\n> "))
+    idx = int(input("\nВведите номер интерфейса:\n> "))
+    selected_iface = list(interfaces.values())[idx]
 
-    return list(interfaces.keys())[idx]
+    return selected_iface["ip"], selected_iface["name"]
 
 def getMAC(ip, interface):
-    conf.iface = interface  # Устанавливаем интерфейс
+    conf.iface = interface
     arp_request = ARP(pdst=ip)
-    arp_response = sr1(arp_request, timeout=7, verbose=False)
+    arp_response = sr1(arp_request, timeout=3, verbose=False)
     return arp_response.hwsrc if arp_response else None
 
-def makeEthernet(src_ip, dst_ip, interface):
-    src_mac = get_if_hwaddr(interface) if src_ip == "0" else getMAC(src_ip, interface)
-    dst_mac = getMAC("192.168.0.1", interface)
+def makeEthernet(src_ip: str, interface):
+    src_mac = getMAC(src_ip, interface)
+
+    if src_mac == None:
+        src_mac = get_if_hwaddr(interface)
+
+    tmp = src_ip.split(".")
+    tmp.pop()
+    tmp.append("1")
+    gateway_ip = '.'.join(tmp)
+
+    print(f"\n[+] Адрес шлюза: {gateway_ip}")
+
+    dst_mac = getMAC(gateway_ip, interface)
     
     if src_mac is not None:
-        print(f"MAC отправителя: {src_mac}")
+        print(f"\n[+] MAC отправителя: {src_mac}")
 
     if dst_mac is not None:
-        print(f"MAC получателя: {dst_mac}")
+        print(f"\n[+] MAC получателя: {dst_mac}")
 
     if dst_mac is None:
-        print(f"MAC-адрес для {dst_ip} не найден.")
+        print(f"\n[-] MAC-адрес для {gateway_ip} не найден.")
         return None
     elif src_mac is None:
-        print(f"MAC-адрес для {src_ip} не найден.")
+        print(f"\n[-] MAC-адрес для {src_ip} не найден.")
         return None
 
     return Ether(src=src_mac, dst=dst_mac)
@@ -66,8 +79,8 @@ def getIPAttrs() -> dict:
     extra_args = dict()
 
     while True:
-        print("Выберите какие параметры пакета хотите изменить:")
-        print("\t0 - далее\n\t1 - ttl\n\t2 - proto\n\t3 - id\n\t4 - frag\n\t5 - flags\n\t6 - tos\n\t7 - checksum\n\t8 - options\n\t9 - len\n\t10 - version")
+        print("\nВыберите какие параметры пакета хотите изменить:")
+        print("\t[0] далее\n\t[1] ttl\n\t[2] proto\n\t[3] id\n\t[4] frag\n\t[5] flags\n\t[6] tos\n\t[7] checksum\n\t[8] options\n\t[9] len\n\t[10] version")
 
         choice = input("> ")
 
@@ -75,43 +88,43 @@ def getIPAttrs() -> dict:
             break
         
         elif choice == "1":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["ttl"] = int(param)
 
         elif choice == "2":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["proto"] = int(param)
 
         elif choice == "3":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["id"] = int(param)
 
         elif choice == "4":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["frag"] = int(param)
 
         elif choice == "5":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["flags"] = int(param)
 
         elif choice == "6":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["tos"] = int(param)
             
         elif choice == "7":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["checksum"] = int(param)
             
         elif choice == "8":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["options"] = int(param)
 
         elif choice == "9":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["len"] = int(param)
 
         elif choice == "10":
-            param = input("Введите значение:\n> ")
+            param = input("\nВведите значение:\n> ")
             extra_args["version"] = int(param)
 
         else:
@@ -147,8 +160,8 @@ def getTCPAttrs() -> dict:
     extra_args = dict()
 
     while True:
-        print("Выберите какие параметры пакета хотите изменить:")
-        print("\t0 - далее\n\t1 - seq\n\t2 - ack\n\t3 - flags\n\t4 - window\n\t5 - chksum\n\t6 - urgptr\n\t7 - options\n\t8 - dataofs\n")
+        print("\nВыберите какие параметры пакета хотите изменить:")
+        print("\t[0] далее\n\t[1] seq\n\t[2] ack\n\t[3] flags\n\t[4] window\n\t[5] chksum\n\t[6] urgptr\n\t[7] options\n\t[8] dataofs\n")
 
         choice = input("> ")
 
@@ -156,35 +169,35 @@ def getTCPAttrs() -> dict:
             break
         
         elif choice == "1":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["seq"] = int(param)
 
         elif choice == "2":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["ack"] = int(param)
 
         elif choice == "3":
-            param = input("Введите значение (например, A или SA или P...):\n> ")
+            param = input("\nВведите значение (например, A или SA или P...):\n> ")
             extra_args["flags"] = param
 
         elif choice == "4":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["window"] = int(param)
 
         elif choice == "5":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["chksum"] = int(param)
 
         elif choice == "6":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["urgptr"] = int(param)
             
         elif choice == "7":
-            param = input("Введите значение (в виде param value; param value;...):\n> ")
+            param = input("\nВведите значение (в виде param value; param value;...):\n> ")
             extra_args["options"] = parseOptionsTCP(param)
         
         elif choice == "8":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["dataofs"] = int(param)
 
         else:
@@ -205,8 +218,8 @@ def getUDPAttrs() -> dict:
     extra_args = dict()
 
     while True:
-        print("Выберите какие параметры пакета хотите изменить:")
-        print("\t0 - далее\n\t1 - len\n\t2 - chksum\n")
+        print("\nВыберите какие параметры пакета хотите изменить:")
+        print("\t[0] далее\n\t[1] len\n\t[2] chksum\n")
 
         choice = input("> ")
 
@@ -214,11 +227,11 @@ def getUDPAttrs() -> dict:
             break
         
         elif choice == "1":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["len"] = int(param)
 
         elif choice == "2":
-            param = input("Введите значение (число):\n> ")
+            param = input("\nВведите значение (число):\n> ")
             extra_args["chksum"] = int(param)
 
         else:
@@ -235,54 +248,82 @@ def makeICMP(type="echo-request", **kwargs):
 
     return icmp_packet
 
-# TODO
 def getICMPAttrs() -> dict:
-    ...
+    extra_args = dict()
 
+    while True:
+        print("\nВыберите какие параметры пакета хотите изменить:")
+        print("\t[0] далее\n\t[1] code\n\t[2] id\n\t[3] seq\n\t[4] chksum\n")
+
+        choice = input("> ")
+
+        if choice == "0":
+            break
+        
+        elif choice == "1":
+            param = input("\nВведите значение (число):\n> ")
+            extra_args["code"] = int(param)
+
+        elif choice == "2":
+            param = input("\nВведите значение (число):\n> ")
+            extra_args["id"] = int(param)
+
+        elif choice == "3":
+            param = input("\nВведите значение (число):\n> ")
+            extra_args["seq"] = int(param)
+
+        elif choice == "4":
+            param = input("\nВведите значение (число):\n> ")
+            extra_args["chksum"] = int(param)
+
+        else:
+            print("Нету такого!")
+    
+    return extra_args
 
 def sendPacket():
     if len(packets_collection) == 0:
-        print("У вас нет сформированных пакетов!\n")
+        print("\nУ вас нет сформированных пакетов!\n")
         return
     
-    print("Ваши пакеты:")
+    print("\nВаши пакеты:")
 
     for idx, packet in enumerate(packets_collection):
         print(f"\t{packet}")
     
-    print("Введите имена пакетов, которые хотите отправить (например: 5 1 3):")
+    print("\nВведите имена пакетов, которые хотите отправить (например: p1 p3 p7):")
     packets = input("> ").split(" ")
 
     for packet in packets:
         try:
             sendp(packets_collection[packet][0], iface=packets_collection[packet][1], verbose=False)
             del packets_collection[packet]
-            print("Пакет отправлен")
+            print(f"\n[+] Пакет <{packet}> отправлен")
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"\n[-] Ошибка: {e}")
 
 def generatePacket():
-    interfaces = get_network_interfaces()
-    interface = choose_interface(interfaces)
+    interfaces = getNetworkInterfaces()
+    default_src_ip, interface = chooseInterface(interfaces)
     
-    src_ip = input("Введите исходный IP (0 - авто [192.168.0.104]):\n> ")
-    dst_ip = input("Введите IP назначения (0 - ibks [195.209.230.198]):\n> ")
+    src_ip = input(f"\nВведите исходный IP (0 - авто [{default_src_ip}]):\n> ")
+    dst_ip = input("\nВведите IP назначения (0 - google.com [142.251.33.110]):\n> ")
+
+    if src_ip == "0":
+        print(f"\n[+] Установлен дефолтный IP источника: {default_src_ip}")
+        src_ip = default_src_ip
 
     if dst_ip == "0":
-        dst_ip = "195.209.230.198"
+        print(f"\n[+] Установлен дефолтный IP назначения: 142.251.33.110")
+        dst_ip = "142.251.33.110"
 
-    print("\n")
-    eth_packet = makeEthernet(src_ip, dst_ip, interface)
-    
-    if src_ip == "0":
-        src_ip = "192.168.0.104"
+    eth_packet = makeEthernet(src_ip, interface)
     
     if eth_packet is None:
         print("Ошибка при создании Ethernet пакета.")
         return
     
-    print("\n")
-    pkt_type = input("Введите тип пакета:\n\t1 - IP\n\t2 - TCP\n\t3 - UDP\n\t4 - ICMP\n> ").strip().upper()
+    pkt_type = input("\nВведите тип пакета:\n\t[1] IP\n\t[2] TCP\n\t[3] UDP\n\t[4] ICMP\n> ").strip().upper()
     
     # IP
     if pkt_type == "1":
@@ -291,20 +332,20 @@ def generatePacket():
     
     # TCP
     elif pkt_type == "2":
-        src_port = int(input("Введите исходный порт:\n> "))
-        dst_port = int(input("Введите целевой порт:\n> "))
+        src_port = int(input("\nВведите исходный порт:\n> "))
+        dst_port = int(input("\nВведите целевой порт:\n> "))
         tcp_packet = makeTCP(src_port, dst_port, **getTCPAttrs())
 
-        print("\nIP менять надо?\n\t0 - да\n\t1 - нет")
+        print("\nIP менять надо?\n\t[0] нет\n\t[1] да")
         choice = input("> ")
 
-        print("\nPayload нужно добавить?\n\t0 - да\n\t1 - нет")
+        print("\nPayload нужно добавить?\n\t[0] да\n\t[1] нет")
         pl_choice = input("> ")
 
         if pl_choice == "0":
-            payload = input("Введите данные:\n> ")
+            payload = input("\nВведите данные:\n> ")
 
-        if choice == "0":
+        if choice == "1":
             if pl_choice == "0":
                 packet = eth_packet / makeIP(src_ip, dst_ip, **getIPAttrs()) / tcp_packet / payload
             else:
@@ -317,20 +358,20 @@ def generatePacket():
     
     # UDP
     elif pkt_type == "3":
-        src_port = int(input("Введите исходный порт:\n> "))
-        dst_port = int(input("Введите целевой порт:\n> "))
+        src_port = int(input("\nВведите исходный порт:\n> "))
+        dst_port = int(input("\nВведите целевой порт:\n> "))
         udp_packet = makeUDP(src_port, dst_port, **getUDPAttrs())
 
-        print("\nIP менять надо?\n\t0 - да\n\t1 - нет")
+        print("\nIP менять надо?\n\t[0] нет\n\t[1] да")
         choice = input("> ")
 
-        print("\nPayload нужно добавить?\n\t0 - да\n\t1 - нет")
+        print("\nPayload нужно добавить?\n\t[0] да\n\t[1] нет")
         pl_choice = input("> ")
 
         if pl_choice == "0":
-            payload = input("Введите данные:\n> ")
+            payload = input("\nВведите данные:\n> ")
 
-        if choice == "0":
+        if choice == "1":
             if pl_choice == "0":
                 packet = eth_packet / makeIP(src_ip, dst_ip, **getIPAttrs()) / udp_packet / payload
             else:
@@ -343,36 +384,52 @@ def generatePacket():
     
     # ICMP
     elif pkt_type == "4":
-        icmp_type = input("Введите тип ICMP:\n\t1 - echo-request\n\t2 - echo-reply:\n> ").strip().lower()
+        icmp_type = input("\nВведите тип ICMP:\n\t[1] echo-request\n\t[2] echo-reply\n> ").strip().lower()
 
         if icmp_type not in ["1", "2"]:
-            print("Нет такого!")
-            exit(-1)
-
-        icmp_packet = makeICMP(type=icmp_type)
-
-        print("\nIP менять надо?\n\t0 - да\n\t1 - нет")
-        choice = input("> ")
-
-        if choice == "0":
-            packet = eth_packet / makeIP(src_ip, dst_ip, **getIPAttrs()) / icmp_packet
+            print("\nНет такого!")
+            return
+        elif icmp_type == "1":
+            icmp_type = "echo-request"
         else:
-            packet = eth_packet / makeIP(src_ip, dst_ip) / icmp_packet
+            icmp_type = "echo-reply"
+
+        icmp_packet = makeICMP(type=icmp_type, **getICMPAttrs())
+
+        print("\nIP менять надо?\n\t[0] нет\n\t[1] да")
+        choice = input("> ")
+        
+        print("\nPayload нужно добавить?\n\t[0] да\n\t[1] нет")
+        pl_choice = input("> ")
+
+        if pl_choice == "0":
+            payload = input("\nВведите данные:\n> ")
+
+        if choice == "1":
+            if pl_choice == "0":
+                packet = eth_packet / makeIP(src_ip, dst_ip, **getIPAttrs()) / icmp_packet / payload
+            else:
+                packet = eth_packet / makeIP(src_ip, dst_ip, **getIPAttrs()) / icmp_packet
+        else:
+            if pl_choice == "0":
+                packet = eth_packet / makeIP(src_ip, dst_ip) / icmp_packet / payload
+            else:
+                packet = eth_packet / makeIP(src_ip, dst_ip) / icmp_packet
     
     else:
-        print("Нет такого!")
+        print("\nНет такого!")
         return
     
-    packet_name = input("Введите имя для этого пакета:\n> ")
+    packet_name = input("\nВведите имя для этого пакета:\n> ")
 
     packets_collection[packet_name] = [packet, interface]
-    print("Пакет успешно сформирован\n")
+    print("\nПакет успешно сформирован\n")
 
 def printMenu():
-    print("Выберите че хотите сделать:\n\t1 - сформировать новый пакет\n\t2 - отправить пакет/последовательность пакетов\n\t3 - выход\n")
+    print("\nВыберите че хотите сделать:\n\t[1] Сформировать новый пакет\n\t[2] Отправить пакет/последовательность пакетов\n\t[3] Выход\n")
 
 if __name__ == "__main__":
-    print("Packets generator v1.0.1 alpha by @milky_VVay\n")
+    print("Packets generator v1.0 alpha by @milky_VVay")
 
     while True:
         printMenu()
